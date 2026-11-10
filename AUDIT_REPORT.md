@@ -31,3 +31,15 @@ Date: 10 November 2026
 - Add scheduled reminder runner with deduplication and timezone-aware quiet hours.
 - Add WhatsApp delivery/read status callbacks, media download/preview, and audit logs for automation actions.
 - Add backups/restore drill, monitoring/error alerting, rate limits, and admin audit trail.
+
+
+## Phase 2 — coach-reviewed Business OS automation
+- Added a coach-controlled reminder toggle to the Automation tab.
+- Enabled Supabase pg_cron and scheduled `private.run_coach_automation()` daily at 07:00 UTC.
+- Daily reminder logic creates in-app notifications for opted-in coaches/clients: missing daily check-ins and active subscriptions expiring within 3 days.
+- Added a private event ledger with unique event keys to prevent duplicate reminders.
+- The scheduler runs only for coach accounts with both `enabled=true` and `reminders_enabled=true`.
+- Cron job verified active: `coach-gado-daily-reminders`.
+- Manual function smoke test returned 0 notifications because there are currently no active coach-client links in the database; this is expected and confirms no sample/test client data was fabricated.
+- Reminder messages are in-app only. WhatsApp delivery of scheduled reminders remains disabled until Meta production credentials and approved template setup are completed.
+- Latest frontend JavaScript syntax check: OK.
