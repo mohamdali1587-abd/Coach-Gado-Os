@@ -15,7 +15,7 @@ Open Supabase Dashboard → Project Settings → Edge Functions → Secrets (or 
 - `WHATSAPP_APP_SECRET`: App Secret from Meta for Developers.
 - `WHATSAPP_PHONE_NUMBER_ID`: the Phone Number ID shown in WhatsApp API Setup.
 - `WHATSAPP_ACCESS_TOKEN`: a production System User access token with `whatsapp_business_messaging` permission.
-- `WHATSAPP_API_VERSION`: a currently supported Graph API version, e.g. `v23.0` only while Meta still supports it.
+- `WHATSAPP_API_VERSION`: a currently supported Graph API version, Use `v26.0` as the current configured default (10 Nov 2026); check Meta's changelog before future upgrades.
 
 Do not put these values in `index.html`, GitHub, client-side settings, or screenshots.
 
