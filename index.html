@@ -293,7 +293,7 @@ async function loadClientAssessment(){let r=await sb.from('client_assessments').
 let selectedConversation=null, commChannel=null, noticeChannel=null;
 function phoneDigits(v){return String(v||'').replace(/[^\d]/g,'').replace(/^00/,'')}
 function waLink(phone){let n=phoneDigits(phone);if(n.startsWith('0'))n='20'+n.slice(1);return n?'https://wa.me/'+n:''}
-function communicationPage(){return '<div class="grid"><div class="card"><h2>المحادثات</h2><div id="conversationList">جارٍ تحميل المحادثات...</div></div><div class="card"><h2>مركز الرسائل</h2><div id="chatPanel" class="muted">اختر محادثة لعرض الرسائل</div></div></div><div class="card section"><h2>الإشعارات والتنبيهات</h2><div id="notificationList">جارٍ تحميل الإشعارات...</div></div>'}
+function communicationPage(){return (!isCoach()?'<div class="card section"><h2>موافقة التواصل عبر واتساب</h2><div id="whatsappConsent">جارٍ تحميل الإعداد...</div></div>':'')+'<div class="grid"><div class="card"><h2>المحادثات</h2><div id="conversationList">جارٍ تحميل المحادثات...</div></div><div class="card"><h2>مركز الرسائل</h2><div id="chatPanel" class="muted">اختر محادثة لعرض الرسائل</div></div></div><div class="card section"><h2>الإشعارات والتنبيهات</h2><div id="notificationList">جارٍ تحميل الإشعارات...</div></div>'}
 function paymentPage(){return isCoach()?'<div class="card"><h2>إثباتات الدفع الواردة</h2><div id="proofList">جارٍ تحميل إثباتات الدفع...</div></div><div class="card section"><h2>متابعة الالتزام</h2><div id="adherenceTasks">جارٍ إعداد قائمة المتابعة...</div></div>':'<div class="card"><h2>إرسال إثبات دفع</h2><form id="proofForm"><div class="formgrid"><div class="field"><label>المدرب</label><select name="coach_id" id="proofCoach" required></select></div><div class="field"><label>الاشتراك</label><select name="subscription_id" id="proofSubscription"><option value="">بدون ربط</option></select></div><div class="field"><label>المبلغ</label><input name="amount" type="number" min="1" step=".01" required></div><div class="field"><label>طريقة الدفع</label><select name="method"><option value="instapay">InstaPay</option><option value="bank_transfer">تحويل بنكي</option><option value="wallet">محفظة إلكترونية</option><option value="cash">نقدي</option><option value="other">أخرى</option></select></div><div class="field"><label>رقم العملية</label><input name="reference"></div><div class="field"><label>صورة أو PDF للإيصال</label><input name="receipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div></div><button class="btn primary">رفع الإثبات للمدرب</button></form></div><div class="card section"><h2>سجل إثباتات الدفع</h2><div id="proofList">جارٍ التحميل...</div></div>'}
 async function loadCommunications(){
  const col=$('#conversationList'),panel=$('#chatPanel'); if(!col||!panel)return;
@@ -309,6 +309,7 @@ async function loadCommunications(){
  if(selectedConversation&&rows.some(x=>x.id===selectedConversation)) await openConversation(selectedConversation,names);
  else if(rows[0]) await openConversation(rows[0].id,names);
  await loadNotifications();
+ if(!isCoach())await loadWhatsAppConsent();
 }
 async function startConversation(){
  let id=$('#newChatClient')?.value;if(!id)return;
@@ -327,7 +328,7 @@ async function openConversation(id,names){
  let wa=waLink(prof.phone);
  let mr=await sb.from('messages').select('*').eq('conversation_id',id).order('sent_at',{ascending:true}).limit(150);if(mr.error)throw mr.error;
  let panel=$('#chatPanel');if(!panel)return;
- panel.innerHTML='<div class="row"><b>'+esc(prof.full_name||'محادثة')+'</b>'+(wa?'<a class="btn good" target="_blank" rel="noopener" href="'+wa+'">واتساب مباشر</a>':'')+'</div><div id="chatMessages" style="max-height:420px;overflow:auto;margin:12px 0">'+(mr.data||[]).map(messageHtml).join('')+'</div><form id="chatForm"><div class="field"><label>رسالتك</label><textarea name="body" rows="2" placeholder="اكتب رسالتك..." required></textarea></div><div class="field"><label>مرفق اختياري (صورة / PDF)</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp,application/pdf"></div><button class="btn primary">إرسال الرسالة</button></form>';
+ panel.innerHTML='<div class="row"><b>'+esc(prof.full_name||'محادثة')+'</b>'+(wa?'<a class="btn good" target="_blank" rel="noopener" href="'+wa+'">واتساب مباشر</a>':'')+(isCoach()?'<button class="btn" onclick="sendWhatsAppApi(\''+cr.data.client_id+'\')">إرسال عبر WhatsApp API</button>':'')+'</div><div id="chatMessages" style="max-height:420px;overflow:auto;margin:12px 0">'+(mr.data||[]).map(messageHtml).join('')+'</div><form id="chatForm"><div class="field"><label>رسالتك</label><textarea name="body" rows="2" placeholder="اكتب رسالتك..." required></textarea></div><div class="field"><label>مرفق اختياري (صورة / PDF)</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp,application/pdf"></div><button class="btn primary">إرسال الرسالة</button></form>';
  let box=$('#chatMessages');if(box)box.scrollTop=box.scrollHeight;
  $('#chatForm').onsubmit=sendChatMessage;
  commChannel=sb.channel('chat-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},async()=>{let rr=await sb.from('messages').select('*').eq('conversation_id',id).order('sent_at',{ascending:true}).limit(150);let b=$('#chatMessages');if(b){b.innerHTML=rr.data.map(messageHtml).join('');b.scrollTop=b.scrollHeight}}).subscribe();
@@ -340,6 +341,26 @@ async function sendChatMessage(ev){
  if(file&&file.size){if(file.size>10*1024*1024)throw new Error('الحد الأقصى للمرفق 10 ميجابايت');let ext=(file.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');path=selectedConversation+'/'+user.id+'/'+uid()+'.'+ext;let up=await sb.storage.from('chat-files').upload(path,file,{contentType:file.type,upsert:false});if(up.error)throw up.error}
  let r=await sb.from('messages').insert({conversation_id:selectedConversation,sender_id:user.id,body:body||'مرفق',attachment_path:path});if(r.error)throw r.error;ev.target.reset();await openConversation(selectedConversation);
 }
+
+async function loadWhatsAppConsent(){
+ let el=$('#whatsappConsent');if(!el)return;
+ let [p,c]=await Promise.all([sb.from('profiles').select('phone').eq('id',user.id).single(),sb.from('whatsapp_contacts').select('*').eq('client_id',user.id).maybeSingle()]);
+ if(p.error){el.textContent=p.error.message;return}
+ let phone=c.data?.phone||p.data.phone||'';
+ el.innerHTML='<div class="field"><label>رقم واتساب بصيغة دولية</label><input id="waConsentPhone" value="'+esc(phone)+'" placeholder="2010xxxxxxxx"></div><label style="display:flex;gap:8px;align-items:center"><input id="waConsentCheck" type="checkbox" '+(c.data?.opt_in?'checked':'')+'> أوافق على استلام رسائل متابعة وخدمة من Coach Gado عبر واتساب، ويمكنني إلغاء الموافقة لاحقًا.</label><button class="btn primary" style="margin-top:10px" onclick="saveWhatsAppConsent()">حفظ الموافقة</button><p class="muted">لن يتم إرسال رسائل API قبل موافقتك، وخارج نافذة 24 ساعة يتطلب الإرسال قالبًا معتمدًا من Meta.</p>';
+}
+async function saveWhatsAppConsent(){
+ let phone=String($('#waConsentPhone')?.value||'').trim(),opt=!!$('#waConsentCheck')?.checked;
+ if(!phone)throw new Error('أدخل رقم واتساب بصيغة دولية');
+ let r=await sb.from('whatsapp_contacts').upsert({client_id:user.id,phone,opt_in:opt,opt_in_at:opt?new Date().toISOString():null,updated_at:new Date().toISOString()},{onConflict:'client_id'});
+ if(r.error)throw r.error;toast(opt?'تم حفظ موافقتك على واتساب':'تم إلغاء موافقتك على واتساب');await loadWhatsAppConsent();
+}
+async function sendWhatsAppApi(clientId){
+ let text=prompt('اكتب رسالة واتساب للعميل (تُرسل كنص فقط إذا كانت نافذة 24 ساعة مفتوحة):');if(!text)return;
+ let r=await sb.functions.invoke('whatsapp-cloud',{body:{client_id:clientId,text}});
+ if(r.error)throw r.error;if(r.data?.error)throw new Error(r.data.error);toast('تم إرسال رسالة واتساب الرسمية');
+}
+
 async function loadNotifications(){
  let el=$('#notificationList');if(!el)return;
  let r=await sb.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(40);
