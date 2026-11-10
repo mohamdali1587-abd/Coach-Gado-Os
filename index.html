@@ -260,15 +260,16 @@ async function startWorkout(dayId){
    html+='</tbody></table></div></div>';
   }
   html+='<div class="field"><label>ملاحظات الحصة (اختياري)</label><textarea name="notes" placeholder="مستوى الأداء، الطاقة، أي ملاحظات..."></textarea></div><div class="session-actions"><span class="muted">سيتم حفظ المجموعات المكتملة فقط.</span><button class="btn primary" type="submit">حفظ الحصة</button></div></form></div>';
-  document.getElementById('sessionModal')?.remove();let m=document.createElement('div');m.id='sessionModal';m.style.cssText='position:fixed;inset:0;background:#000d;z-index:80;overflow:auto;padding:12px';m.innerHTML='<div style="max-width:850px;margin:20px auto">'+html+'</div>';document.body.appendChild(m);document.getElementById('workoutSessionForm').onsubmit=saveWorkoutSession;
+  document.getElementById('sessionModal')?.remove();let m=document.createElement('div');m.id='sessionModal';m.style.cssText='position:fixed;inset:0;background:#000d;z-index:80;overflow:auto;padding:12px';m.innerHTML='<div style="max-width:850px;margin:20px auto">'+html+'</div>';document.body.appendChild(m);bindWorkoutDraft(dayId);document.getElementById('workoutSessionForm').onsubmit=saveWorkoutSession;
  }catch(e){toast(e.message||'تعذر فتح تسجيل الحصة',true)}
 }
 async function saveWorkoutSession(e){
  e.preventDefault();let form=e.target,d=Object.fromEntries(new FormData(form)),dayId=d.day_id,assignment=cache.assignments.find(x=>x.program_id);if(!assignment)throw new Error('لم يتم العثور على البرنامج النشط');
  let ex=await sb.from('program_exercises').select('*').eq('program_day_id',dayId).order('sort_order');if(ex.error)throw ex.error;
- let log=await sb.from('workout_logs').insert({client_id:user.id,assignment_id:assignment.id,program_day_id:dayId,workout_date:dateNow(),started_at:new Date().toISOString(),completed_at:new Date().toISOString(),notes:d.notes||'تم تسجيل الحصة'}).select().single();if(log.error)throw log.error;
- let rows=[];for(let item of ex.data){let count=Math.max(1,Math.min(10,Number(item.sets)||3));for(let n=1;n<=count;n++){let done=form.elements['done_'+item.id+'_'+n]?.checked;if(!done)continue;let reps=Number(d['reps_'+item.id+'_'+n]||0),weight=Number(d['weight_'+item.id+'_'+n]||0),rpe=Number(d['rpe_'+item.id+'_'+n]||0);if(reps<1)continue;rows.push({workout_log_id:log.data.id,program_exercise_id:item.id,exercise_id:item.exercise_id,exercise_name_snapshot:item.exercise_name_snapshot,set_number:n,reps:reps,weight_kg:weight,rpe:rpe||null,is_warmup:false})}}
- if(rows.length){let w=await sb.from('workout_sets').insert(rows);if(w.error)throw w.error}
+ let rows=[];for(let item of ex.data){let count=Math.max(1,Math.min(10,Number(item.sets)||3));for(let n=1;n<=count;n++){let done=form.elements['done_'+item.id+'_'+n]?.checked;if(!done)continue;let reps=Number(d['reps_'+item.id+'_'+n]||0),weight=Number(d['weight_'+item.id+'_'+n]||0),rpe=Number(d['rpe_'+item.id+'_'+n]||0);if(reps<1)continue;rows.push({program_exercise_id:item.id,exercise_id:item.exercise_id,exercise_name_snapshot:item.exercise_name_snapshot,set_number:n,reps:reps,weight_kg:weight,rpe:rpe||null,is_warmup:false})}}
+ let payload={client_id:user.id,assignment_id:assignment.id,program_day_id:dayId,workout_date:dateNow(),started_at:new Date().toISOString(),completed_at:new Date().toISOString(),notes:d.notes||'تم تسجيل الحصة',sets:rows};
+ if(!navigator.onLine){localStorage.setItem(workoutQueueKey(dayId),JSON.stringify(payload));toast('تم حفظ الحصة على الجهاز — ستتم مزامنتها عند عودة الإنترنت');document.getElementById('sessionModal')?.remove();return}
+ await syncWorkoutPayload(payload);localStorage.removeItem(workoutQueueKey(dayId));localStorage.removeItem(workoutDraftKey(dayId));
  if(window.__coachGadoRestTimer){clearInterval(window.__coachGadoRestTimer);window.__coachGadoRestTimer=null}
  document.getElementById('sessionModal')?.remove();toast('تم حفظ الحصة بنجاح · '+rows.length+' مجموعة');await loadClientTraining()
 }
@@ -309,3 +310,29 @@ function startRestTimer(seconds){
  const paint=()=>{let m=Math.floor(left/60),ss=String(left%60).padStart(2,'0');if(el)el.textContent=m+':'+ss+' متبقي';};
  paint();window.__coachGadoRestTimer=setInterval(()=>{left--;paint();if(left<=0){clearInterval(window.__coachGadoRestTimer);window.__coachGadoRestTimer=null;if(el)el.textContent='انتهت الراحة';if(typeof toast==='function')toast('انتهى وقت الراحة — ابدأ المجموعة التالية');}},1000);
 }
+
+function workoutDraftKey(dayId){return 'coachgado_workout_draft_'+user.id+'_'+dayId}
+function workoutQueueKey(dayId){return 'coachgado_workout_queue_'+user.id+'_'+dayId}
+function bindWorkoutDraft(dayId){
+ const form=document.getElementById('workoutSessionForm');if(!form)return;
+ const draftKey=workoutDraftKey(dayId),queued=localStorage.getItem(workoutQueueKey(dayId));
+ if(queued){let p;try{p=JSON.parse(queued)}catch{}if(p){toast('توجد حصة محفوظة محليًا بانتظار المزامنة');}}
+ let saved=localStorage.getItem(draftKey);if(saved){try{let data=JSON.parse(saved);for(let [k,v] of Object.entries(data)){let el=form.elements[k];if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else el.value=v}toast('تم استرجاع مسودة الحصة السابقة')}catch{}}
+ let status=document.createElement('div');status.className='notice';status.id='workoutOfflineStatus';status.style.margin='10px 0';form.prepend(status);
+ const paint=()=>{status.textContent=navigator.onLine?'متصل — يتم حفظ تقدمك تلقائيًا على هذا الجهاز':'بدون إنترنت — بيانات الحصة محفوظة محليًا';status.style.borderColor=navigator.onLine?'#555':'#DB2126'};paint();
+ let timer=null;const persist=()=>{let obj={};for(let el of form.elements){if(!el.name||el.name==='day_id')continue;obj[el.name]=el.type==='checkbox'?el.checked:el.value}localStorage.setItem(draftKey,JSON.stringify(obj));paint()};
+ form.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(persist,250)});form.addEventListener('change',persist);persist();
+}
+async function syncWorkoutPayload(payload){
+ let {sets,...logData}=payload;let log=await sb.from('workout_logs').insert(logData).select().single();if(log.error)throw log.error;
+ if(sets?.length){let rows=sets.map(x=>({...x,workout_log_id:log.data.id}));let r=await sb.from('workout_sets').insert(rows);if(r.error){await sb.from('workout_logs').delete().eq('id',log.data.id);throw r.error}}
+ return log.data;
+}
+async function syncQueuedWorkouts(){
+ if(!navigator.onLine||!user)return;
+ let prefix='coachgado_workout_queue_'+user.id+'_';
+ for(let i=0;i<localStorage.length;i++){let k=localStorage.key(i);if(!k||!k.startsWith(prefix))continue;try{let p=JSON.parse(localStorage.getItem(k));await syncWorkoutPayload(p);localStorage.removeItem(k);localStorage.removeItem(k.replace('coachgado_workout_queue_','coachgado_workout_draft_'));toast('تمت مزامنة الحصة المحفوظة دون إنترنت')}catch(e){toast('تعذرت مزامنة الحصة: '+(e.message||'خطأ اتصال'),true)}}
+}
+window.addEventListener('online',()=>{syncQueuedWorkouts()});
+window.addEventListener('offline',()=>{let n=document.getElementById('workoutOfflineStatus');if(n)n.textContent='بدون إنترنت — بيانات الحصة محفوظة محليًا'});
+window.addEventListener('load',()=>{if(navigator.onLine)syncQueuedWorkouts()});
