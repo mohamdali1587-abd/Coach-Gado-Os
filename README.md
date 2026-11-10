@@ -20,9 +20,10 @@ Arabic RTL online fitness coaching workspace for Coach Gado.
 - In-app notifications for messages, workouts, check-ins and payment review
 - WhatsApp direct links and official Cloud API integration
 - Configurable Arabic WhatsApp auto-replies (keyword-based, coach-controlled)
+- Daily in-app reminders for missing check-ins and subscriptions expiring within 3 days, scheduled through Supabase Cron and deduplicated
 
 ## Automation
-The coach can enable/disable auto-replies and edit the greeting, pricing, training, nutrition and human-handoff messages from the **الأتمتة** tab. Incoming WhatsApp messages are accepted only after Meta webhook signature verification, matched to an opted-in client with an active coach relationship, and deduplicated by Meta message ID. The auto-reply engine uses deterministic keyword routing; it does not make up prices, medical advice, or training prescriptions.
+The coach can enable/disable auto-replies and reminders, and edit the greeting, pricing, training, nutrition and human-handoff messages from the **الأتمتة** tab. Daily in-app reminders run at 07:00 UTC (09:00 Cairo standard time; local clock shifts during daylight-saving time) for missing daily check-ins and subscriptions ending within 3 days. Reminders are idempotent and only run when the coach enables both automation and reminders. Incoming WhatsApp messages are accepted only after Meta webhook signature verification, matched to an opted-in client with an active coach relationship, and deduplicated by Meta message ID. The auto-reply engine uses deterministic keyword routing; it does not make up prices, medical advice, or training prescriptions.
 
 For more complex visual workflows (scheduled reminders, CRM routing, lead qualification and multi-step integrations), n8n can be connected as an optional automation orchestrator. A separate n8n server and credentials are required; n8n is not bundled into this static Vercel app. Use official Meta WhatsApp Cloud API nodes/HTTP requests only. Do not use unofficial QR-session gateways for a production business number.
 
