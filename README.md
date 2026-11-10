@@ -22,3 +22,12 @@ The PWA caches the app shell. Data operations require an internet connection; of
 
 ## Deployment
 Vercel project: `coach-gado-fitness-hub-app`. Deploy from `main` after review.
+
+
+## Automated coaching (initial release)
+- Client assessment intake: age, sex, height, current weight, goal, activity, experience, training frequency, equipment, limitations, food preferences, and allergies.
+- Rule-based training program suggestions from the existing exercise library.
+- Nutrition target estimation using Mifflin-St Jeor and the client's goal/activity profile, with meals assembled from the existing food library.
+- Check-in summaries and coach-facing progression suggestions from recorded workout sets.
+- Generated plans are drafts: the coach must review exercise selection, food allergies/preferences, portions, and targets before assigning them.
+- Offline write queue and background synchronization are not implemented yet.
