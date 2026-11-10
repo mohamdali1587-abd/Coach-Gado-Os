@@ -325,6 +325,7 @@ async function openConversation(id,names){
  let cr=await sb.from('conversations').select('*').eq('id',id).single();if(cr.error)throw cr.error;
  let otherId=isCoach()?cr.data.client_id:cr.data.coach_id;
  let prof=(names&&names[otherId])||((await sb.from('profiles').select('id,full_name,phone').eq('id',otherId).maybeSingle()).data)||{};
+ if(!prof.phone){let wc=await sb.from('whatsapp_contacts').select('phone').eq('client_id',otherId).maybeSingle();if(wc.data?.phone)prof.phone=wc.data.phone}
  let wa=waLink(prof.phone);
  let mr=await sb.from('messages').select('*').eq('conversation_id',id).order('sent_at',{ascending:true}).limit(150);if(mr.error)throw mr.error;
  let panel=$('#chatPanel');if(!panel)return;
