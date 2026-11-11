@@ -4,6 +4,8 @@ Arabic RTL online fitness coaching workspace for Coach Gado.
 
 ## Stack
 - Static responsive PWA frontend hosted on Vercel
+- Chart.js 4.6.1 for interactive progress charts (vendored locally for offline use)
+- Lucide 1.72.0 SVG icons for navigation (selected SVG assets only)
 - Supabase Auth, Postgres, Storage and Realtime
 - Row Level Security for coach/client data isolation
 - Supabase Edge Functions for official WhatsApp Cloud API integration
